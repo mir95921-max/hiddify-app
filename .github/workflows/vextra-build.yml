@@ -70,6 +70,9 @@ jobs:
       - name: Prepare
         run: make ${{ matrix.platform }}-prepare
 
+      - name: Apply VextraVPN launcher icons
+        run: dart run flutter_launcher_icons
+
       - name: Build (mobile / mac)
         if: matrix.platform != 'windows'
         run: make ${{ matrix.platform }}-release

@@ -73,6 +73,10 @@ jobs:
       - name: Apply VextraVPN launcher icons
         run: dart run flutter_launcher_icons
 
+      - name: Remove legacy Android launcher icons (fix duplicate resources)
+        if: startsWith(matrix.platform, 'android')
+        run: find android/app/src/main/res -name "ic_launcher.webp" -delete
+
       - name: Build (mobile / mac)
         if: matrix.platform != 'windows'
         run: make ${{ matrix.platform }}-release

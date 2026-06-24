@@ -214,6 +214,20 @@ class AddProfileManual extends HookConsumerWidget {
           ),
 
           Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(top: 4, bottom: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.send_rounded),
+                    label: const Text("Войти через Telegram"),
+                    onPressed: () => UriUtils.tryLaunch(Uri.parse(Constants.telegramChannelUrl)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(bottom: 8),
             child: Row(
               children: [

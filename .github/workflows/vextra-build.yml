@@ -32,6 +32,13 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Free disk space (Android)
+        if: startsWith(matrix.platform, 'android')
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/powershell /usr/local/share/chromium || true
+          sudo apt-get clean || true
+          df -h
+
       - name: Setup Java (Android)
         if: startsWith(matrix.platform, 'android')
         uses: actions/setup-java@v5

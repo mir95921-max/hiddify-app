@@ -1,0 +1,42 @@
+name: Publish Release
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Build run id whose artifacts to publish"
+        required: true
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v6
+        with:
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: artifacts
+
+      - name: Stage and rename
+        run: |
+          mkdir -p rel
+          cp artifacts/vextra-android-apk/VextraVPN-universal.apk rel/ 2>/dev/null || true
+          cp artifacts/vextra-android-apk/VextraVPN-arm64.apk rel/ 2>/dev/null || true
+          dmg=$(find artifacts/vextra-macos -name "*.dmg" | head -1); [ -n "$dmg" ] && cp "$dmg" rel/VextraVPN.dmg
+          exe=$(find artifacts/vextra-windows -name "*.exe" | head -1); [ -n "$exe" ] && cp "$exe" rel/VextraVPN-Setup.exe
+          echo "=== release files ==="
+          ls -lh rel
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-latest
+          name: VextraVPN Apps
+          body: "Latest VextraVPN app builds (Android APK, Windows EXE, macOS DMG)."
+          files: rel/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

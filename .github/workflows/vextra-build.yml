@@ -1,0 +1,108 @@
+name: VextraVPN Build
+on:
+  workflow_dispatch:
+
+env:
+  IS_GITHUB_ACTIONS: 1
+  CHANNEL: prod
+  FLUTTER_VERSION: "3.38.5"
+
+jobs:
+  build:
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: android-apk
+            os: ubuntu-latest
+          - platform: windows
+            os: windows-latest
+          - platform: macos
+            os: macos-15
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2.21.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Setup Java (Android)
+        if: startsWith(matrix.platform, 'android')
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: "17"
+
+      - name: Setup Android SDK
+        if: startsWith(matrix.platform, 'android')
+        uses: android-actions/setup-android@v3
+
+      - name: Install Inno Setup (Windows)
+        if: matrix.platform == 'windows'
+        run: choco install innosetup -y
+
+      - name: Install deps
+        run: make ${{ matrix.platform }}-install-deps
+
+      - name: Add pub-cache to PATH (unix)
+        if: runner.os != 'Windows'
+        run: echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
+
+      - name: Add pub-cache to PATH (windows)
+        if: runner.os == 'Windows'
+        run: Add-Content -Path $env:GITHUB_PATH -Value "$env:LOCALAPPDATA\Pub\Cache\bin"
+
+      - name: Generate Android keystore (self-signed for sideload)
+        if: startsWith(matrix.platform, 'android')
+        run: |
+          keytool -genkeypair -v -keystore android/key.jks -storepass 123456 -keypass 123456 -alias upload -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=VextraVPN, O=VextraVPN, L=Tashkent, C=UZ"
+          echo "storeFile=$(pwd)/android/key.jks" > android/key.properties
+          echo "storePassword=123456" >> android/key.properties
+          echo "keyPassword=123456" >> android/key.properties
+          echo "keyAlias=upload" >> android/key.properties
+
+      - name: Prepare
+        run: make ${{ matrix.platform }}-prepare
+
+      - name: Build (mobile / mac)
+        if: matrix.platform != 'windows'
+        run: make ${{ matrix.platform }}-release
+
+      - name: Build (windows exe)
+        if: matrix.platform == 'windows'
+        run: make windows-exe-release
+
+      - name: Collect Android
+        if: matrix.platform == 'android-apk'
+        run: |
+          mkdir -p out
+          cp build/app/outputs/flutter-apk/app-release.apk out/VextraVPN-universal.apk || true
+          cp build/app/outputs/flutter-apk/*arm64-v8a*.apk out/VextraVPN-arm64.apk || true
+          ls -lR out
+
+      - name: Collect macOS
+        if: matrix.platform == 'macos'
+        run: |
+          mkdir -p out
+          find dist -type f \( -name "*.dmg" -o -name "*.pkg" \) -exec cp {} out/ \;
+          ls -lR out || true
+
+      - name: Collect Windows
+        if: matrix.platform == 'windows'
+        run: |
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+          Get-ChildItem -Path dist -Recurse -Include *.exe | ForEach-Object { Copy-Item $_.FullName -Destination out\ }
+          Get-ChildItem -Path out
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: vextra-${{ matrix.platform }}
+          path: out
+          retention-days: 7
